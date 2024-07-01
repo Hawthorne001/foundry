@@ -5,15 +5,16 @@ use crate::{
     fork::fork_config,
     utils::http_provider_with_signer,
 };
-use alloy_network::{EthereumSigner, TransactionBuilder};
-use alloy_primitives::{address, fixed_bytes, Address, U256, U64};
+use alloy_network::{EthereumWallet, TransactionBuilder};
+use alloy_primitives::{address, fixed_bytes, Address, U256};
 use alloy_provider::{ext::TxPoolApi, Provider};
-use alloy_rpc_types::{BlockId, BlockNumberOrTag, TransactionRequest, WithOtherFields};
-use anvil::{eth::api::CLIENT_VERSION, spawn, Hardfork, NodeConfig};
-use anvil_core::{
-    eth::EthRequest,
-    types::{AnvilMetadata, ForkedNetwork, Forking, NodeEnvironment, NodeForkConfig, NodeInfo},
+use alloy_rpc_types::{
+    anvil::{ForkedNetwork, Forking, Metadata, NodeEnvironment, NodeForkConfig, NodeInfo},
+    BlockId, BlockNumberOrTag, TransactionRequest,
 };
+use alloy_serde::WithOtherFields;
+use anvil::{eth::api::CLIENT_VERSION, spawn, Hardfork, NodeConfig};
+use anvil_core::eth::EthRequest;
 use foundry_evm::revm::primitives::SpecId;
 use std::{
     str::FromStr,
@@ -287,14 +288,14 @@ async fn test_set_next_timestamp() {
 
     api.evm_mine(None).await.unwrap();
 
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     assert_eq!(block.header.number.unwrap(), 1);
     assert_eq!(block.header.timestamp, next_timestamp.as_secs());
 
     api.evm_mine(None).await.unwrap();
 
-    let next = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let next = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
     assert_eq!(next.header.number.unwrap(), 2);
 
     assert!(next.header.timestamp > block.header.timestamp);
@@ -314,12 +315,12 @@ async fn test_evm_set_time() {
 
     // mine a block
     api.evm_mine(None).await.unwrap();
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     assert!(block.header.timestamp >= timestamp.as_secs());
 
     api.evm_mine(None).await.unwrap();
-    let next = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let next = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     assert!(next.header.timestamp > block.header.timestamp);
 }
@@ -338,7 +339,7 @@ async fn test_evm_set_time_in_past() {
 
     // mine a block
     api.evm_mine(None).await.unwrap();
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     assert!(block.header.timestamp >= timestamp.as_secs());
     assert!(block.header.timestamp < now.as_secs());
@@ -353,42 +354,44 @@ async fn test_timestamp_interval() {
     let interval = 10;
 
     for _ in 0..5 {
-        let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+        let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
         // mock timestamp
         api.evm_set_block_timestamp_interval(interval).unwrap();
         api.evm_mine(None).await.unwrap();
 
-        let new_block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+        let new_block =
+            provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
         assert_eq!(new_block.header.timestamp, block.header.timestamp + interval);
     }
 
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     let next_timestamp = block.header.timestamp + 50;
     api.evm_set_next_block_timestamp(next_timestamp).unwrap();
 
     api.evm_mine(None).await.unwrap();
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
     assert_eq!(block.header.timestamp, next_timestamp);
 
     api.evm_mine(None).await.unwrap();
 
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
     // interval also works after setting the next timestamp manually
     assert_eq!(block.header.timestamp, next_timestamp + interval);
 
     assert!(api.evm_remove_block_timestamp_interval().unwrap());
 
     api.evm_mine(None).await.unwrap();
-    let new_block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let new_block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
 
     // offset is applied correctly after resetting the interval
     assert!(new_block.header.timestamp > block.header.timestamp);
 
     api.evm_mine(None).await.unwrap();
-    let another_block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let another_block =
+        provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
     // check interval is disabled
     assert!(another_block.header.timestamp - new_block.header.timestamp < interval);
 }
@@ -429,13 +432,15 @@ async fn can_get_node_info() {
     let provider = handle.http_provider();
 
     let block_number = provider.get_block_number().await.unwrap();
-    let block = provider.get_block(BlockId::from(block_number), false).await.unwrap().unwrap();
+    let block =
+        provider.get_block(BlockId::from(block_number), false.into()).await.unwrap().unwrap();
+    let hard_fork: &str = SpecId::CANCUN.into();
 
     let expected_node_info = NodeInfo {
-        current_block_number: U64::from(0),
+        current_block_number: 0_u64,
         current_block_timestamp: 1,
         current_block_hash: block.header.hash.unwrap(),
-        hard_fork: SpecId::CANCUN,
+        hard_fork: hard_fork.to_string(),
         transaction_order: "fees".to_owned(),
         environment: NodeEnvironment {
             base_fee: U256::from_str("0x3b9aca00").unwrap().to(),
@@ -463,13 +468,14 @@ async fn can_get_metadata() {
 
     let block_number = provider.get_block_number().await.unwrap();
     let chain_id = provider.get_chain_id().await.unwrap();
-    let block = provider.get_block(BlockId::from(block_number), false).await.unwrap().unwrap();
+    let block =
+        provider.get_block(BlockId::from(block_number), false.into()).await.unwrap().unwrap();
 
-    let expected_metadata = AnvilMetadata {
+    let expected_metadata = Metadata {
         latest_block_hash: block.header.hash.unwrap(),
         latest_block_number: block_number,
         chain_id,
-        client_version: CLIENT_VERSION,
+        client_version: CLIENT_VERSION.to_string(),
         instance_id: api.instance_id(),
         forked_network: None,
         snapshots: Default::default(),
@@ -488,13 +494,14 @@ async fn can_get_metadata_on_fork() {
 
     let block_number = provider.get_block_number().await.unwrap();
     let chain_id = provider.get_chain_id().await.unwrap();
-    let block = provider.get_block(BlockId::from(block_number), false).await.unwrap().unwrap();
+    let block =
+        provider.get_block(BlockId::from(block_number), false.into()).await.unwrap().unwrap();
 
-    let expected_metadata = AnvilMetadata {
+    let expected_metadata = Metadata {
         latest_block_hash: block.header.hash.unwrap(),
         latest_block_number: block_number,
         chain_id,
-        client_version: CLIENT_VERSION,
+        client_version: CLIENT_VERSION.to_string(),
         instance_id: api.instance_id(),
         forked_network: Some(ForkedNetwork {
             chain_id,
@@ -541,7 +548,7 @@ async fn test_get_transaction_receipt() {
     let receipt = provider.send_transaction(tx.clone()).await.unwrap().get_receipt().await.unwrap();
 
     // the block should have the new base fee
-    let block = provider.get_block(BlockId::default(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::default(), false.into()).await.unwrap().unwrap();
     assert_eq!(block.header.base_fee_per_gas.unwrap(), new_base_fee.to::<u128>());
 
     // mine blocks
@@ -624,10 +631,11 @@ async fn test_fork_revert_call_latest_block_timestamp() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_remove_pool_transactions() {
-    let (api, handle) = spawn(NodeConfig::test()).await;
+    let (api, handle) =
+        spawn(NodeConfig::test().with_blocktime(Some(Duration::from_secs(5)))).await;
 
     let wallet = handle.dev_wallets().next().unwrap();
-    let signer: EthereumSigner = wallet.clone().into();
+    let signer: EthereumWallet = wallet.clone().into();
     let from = wallet.address();
 
     let provider = http_provider_with_signer(&handle.http_endpoint(), signer);

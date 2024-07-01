@@ -135,6 +135,10 @@ pub struct TestArgs {
     /// Print detailed test summary table.
     #[arg(long, help_heading = "Display options", requires = "summary")]
     pub detailed: bool,
+
+    /// Show test execution progress.
+    #[arg(long)]
+    pub show_progress: bool,
 }
 
 impl TestArgs {
@@ -162,10 +166,10 @@ impl TestArgs {
             *selection = OutputSelection::common_output_selection(["abi".to_string()]);
         });
 
-        let output = project.compile_sparse(Box::new(filter.clone()))?;
+        let output = project.compile()?;
 
         if output.has_compiler_errors() {
-            println!("{}", output);
+            println!("{output}");
             eyre::bail!("Compilation failed");
         }
 
@@ -213,7 +217,7 @@ impl TestArgs {
 
         // Always recompile all sources to ensure that `getCode` cheatcode can use any artifact.
         test_sources.extend(source_files_iter(
-            project.paths.sources,
+            &project.paths.sources,
             MultiCompilerLanguage::FILE_EXTENSIONS,
         ));
 
@@ -290,12 +294,7 @@ impl TestArgs {
 
         // Prepare the test builder
         let should_debug = self.debug.is_some();
-
-        // Clone the output only if we actually need it later for the debugger.
-        let output_clone = should_debug.then(|| output.clone());
-
         let config = Arc::new(config);
-
         let runner = MultiContractRunnerBuilder::new(config.clone())
             .set_debug(should_debug)
             .initial_balance(evm_opts.initial_balance)
@@ -304,7 +303,7 @@ impl TestArgs {
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .with_test_options(test_options)
             .enable_isolation(evm_opts.isolate)
-            .build(project_root, output, env, evm_opts)?;
+            .build(project_root, &output, env, evm_opts)?;
 
         if let Some(debug_test_pattern) = &self.debug {
             let test_pattern = &mut filter.args_mut().test_pattern;
@@ -331,15 +330,14 @@ impl TestArgs {
                 return Err(eyre::eyre!("no tests were executed"));
             };
 
-            let sources = ContractSources::from_project_output(
-                output_clone.as_ref().unwrap(),
-                project.root(),
-                &libraries,
-            )?;
+            let sources =
+                ContractSources::from_project_output(&output, project.root(), Some(&libraries))?;
 
             // Run the debugger.
             let mut builder = Debugger::builder()
-                .debug_arenas(test_result.debug.as_slice())
+                .traces(
+                    test_result.traces.iter().filter(|(t, _)| t.is_execution()).cloned().collect(),
+                )
                 .sources(sources)
                 .breakpoints(test_result.breakpoints.clone());
             if let Some(decoder) = &outcome.last_run_decoder {
@@ -387,9 +385,10 @@ impl TestArgs {
         // Run tests.
         let (tx, rx) = channel::<(String, SuiteResult)>();
         let timer = Instant::now();
+        let show_progress = self.show_progress;
         let handle = tokio::task::spawn_blocking({
             let filter = filter.clone();
-            move || runner.test(&filter, tx)
+            move || runner.test(&filter, tx, show_progress)
         });
 
         // Set up trace identifiers.

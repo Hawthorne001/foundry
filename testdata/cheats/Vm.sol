@@ -173,6 +173,8 @@ interface Vm {
     function deal(address account, uint256 newBalance) external;
     function deleteSnapshot(uint256 snapshotId) external returns (bool success);
     function deleteSnapshots() external;
+    function deployCode(string calldata artifactPath) external returns (address deployedAddress);
+    function deployCode(string calldata artifactPath, bytes calldata constructorArgs) external returns (address deployedAddress);
     function deriveKey(string calldata mnemonic, uint32 index) external pure returns (uint256 privateKey);
     function deriveKey(string calldata mnemonic, string calldata derivationPath, uint32 index) external pure returns (uint256 privateKey);
     function deriveKey(string calldata mnemonic, uint32 index, string calldata language) external pure returns (uint256 privateKey);
@@ -314,6 +316,7 @@ interface Vm {
     function prompt(string calldata promptText) external returns (string memory input);
     function promptAddress(string calldata promptText) external returns (address);
     function promptSecret(string calldata promptText) external returns (string memory input);
+    function promptSecretUint(string calldata promptText) external returns (uint256);
     function promptUint(string calldata promptText) external returns (uint256);
     function randomAddress() external returns (address);
     function randomUint() external returns (uint256);
@@ -343,10 +346,11 @@ interface Vm {
     function rollFork(bytes32 txHash) external;
     function rollFork(uint256 forkId, uint256 blockNumber) external;
     function rollFork(uint256 forkId, bytes32 txHash) external;
-    function rpc(string calldata method, string calldata params) external returns (bytes memory data);
     function rpcUrl(string calldata rpcAlias) external view returns (string memory json);
     function rpcUrlStructs() external view returns (Rpc[] memory urls);
     function rpcUrls() external view returns (string[2][] memory urls);
+    function rpc(string calldata method, string calldata params) external returns (bytes memory data);
+    function rpc(string calldata urlOrAlias, string calldata method, string calldata params) external returns (bytes memory data);
     function selectFork(uint256 forkId) external;
     function serializeAddress(string calldata objectKey, string calldata valueKey, address value) external returns (string memory json);
     function serializeAddress(string calldata objectKey, string calldata valueKey, address[] calldata values) external returns (string memory json);

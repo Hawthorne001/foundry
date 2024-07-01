@@ -1,3 +1,5 @@
+//! Config providers.
+
 use crate::{Config, Warning, DEPRECATIONS};
 use figment::{
     value::{Dict, Map, Value},
@@ -126,7 +128,7 @@ pub struct FallbackProfileProvider<P> {
 impl<P> FallbackProfileProvider<P> {
     /// Creates a new fallback profile provider.
     pub fn new(provider: P, profile: impl Into<Profile>, fallback: impl Into<Profile>) -> Self {
-        FallbackProfileProvider { provider, profile: profile.into(), fallback: fallback.into() }
+        Self { provider, profile: profile.into(), fallback: fallback.into() }
     }
 }
 

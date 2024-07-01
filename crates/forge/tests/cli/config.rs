@@ -4,16 +4,16 @@ use alloy_primitives::{Address, B256, U256};
 use foundry_cli::utils as forge_utils;
 use foundry_compilers::{
     artifacts::{BytecodeHash, OptimizerDetails, RevertStrings, YulDetails},
-    Solc,
+    solc::Solc,
 };
 use foundry_config::{
     cache::{CachedChains, CachedEndpoints, StorageCachingConfig},
     fs_permissions::{FsAccessPermission, PathPermission},
-    Config, FsPermissions, FuzzConfig, InvariantConfig, Language, SolcReq,
+    Config, FsPermissions, FuzzConfig, InvariantConfig, SolcReq,
 };
 use foundry_evm::opts::EvmOpts;
 use foundry_test_utils::{
-    foundry_compilers::{remappings::Remapping, EvmVersion},
+    foundry_compilers::artifacts::{remappings::Remapping, EvmVersion},
     util::{pretty_err, OutputExt, TestCommand, OTHER_SOLC_VERSION},
 };
 use path_slash::PathBufExt;
@@ -29,7 +29,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
     // explicitly set all values
     let input = Config {
         profile: Config::DEFAULT_PROFILE,
-        __root: Default::default(),
+        root: Default::default(),
         src: "test-src".into(),
         test: "test-test".into(),
         script: "test-script".into(),
@@ -43,7 +43,6 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         gas_reports: vec!["Contract".to_string()],
         gas_reports_ignore: vec![],
         solc: Some(SolcReq::Local(PathBuf::from("custom-solc"))),
-        vyper: Some(PathBuf::from("custom-vyper")),
         auto_detect_solc: false,
         auto_detect_remappings: true,
         offline: true,
@@ -65,6 +64,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         contract_pattern_inverse: None,
         path_pattern: None,
         path_pattern_inverse: None,
+        coverage_pattern_inverse: None,
         fuzz: FuzzConfig {
             runs: 1000,
             max_test_rejects: 100203,
@@ -136,9 +136,13 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         isolate: true,
         unchecked_cheatcode_artifacts: false,
         create2_library_salt: Config::DEFAULT_CREATE2_LIBRARY_SALT,
-        lang: Language::Solidity,
-        __non_exhaustive: (),
-        __warnings: vec![],
+        vyper: Default::default(),
+        skip: vec![],
+        dependencies: Default::default(),
+        warnings: vec![],
+        assertions_revert: true,
+        legacy_assertions: false,
+        _non_exhaustive: (),
     };
     prj.write_config(input.clone());
     let config = cmd.config();
@@ -446,7 +450,6 @@ forgetest!(can_set_gas_price, |prj, cmd| {
 forgetest_init!(can_detect_lib_foundry_toml, |prj, cmd| {
     let config = cmd.config();
     let remappings = config.remappings.iter().cloned().map(Remapping::from).collect::<Vec<_>>();
-    dbg!(&remappings);
     similar_asserts::assert_eq!(
         remappings,
         vec![

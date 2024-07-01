@@ -1,4 +1,9 @@
+//! # foundry-verify
+//!
+//! Smart contract verification.
+
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[macro_use]
 extern crate tracing;
@@ -12,7 +17,7 @@ use foundry_cli::{
     utils::{self, LoadConfig},
 };
 use foundry_common::{compile::ProjectCompiler, ContractsByArtifact};
-use foundry_compilers::{info::ContractInfo, EvmVersion, Solc};
+use foundry_compilers::{artifacts::EvmVersion, compilers::solc::Solc, info::ContractInfo};
 use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config, SolcReq};
 use itertools::Itertools;
 use provider::VerificationProviderType;
@@ -48,7 +53,7 @@ pub struct VerifierArgs {
 
 impl Default for VerifierArgs {
     fn default() -> Self {
-        VerifierArgs { verifier: VerificationProviderType::Etherscan, verifier_url: None }
+        Self { verifier: VerificationProviderType::Etherscan, verifier_url: None }
     }
 }
 

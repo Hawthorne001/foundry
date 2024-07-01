@@ -1,17 +1,21 @@
 //! Support for forking off another client
 
-use crate::eth::{backend::db::Db, error::BlockchainError};
+use crate::eth::{backend::db::Db, error::BlockchainError, pool::transactions::PoolTransaction};
 use alloy_primitives::{Address, Bytes, StorageValue, B256, U256};
-use alloy_provider::{ext::DebugApi, Provider};
+use alloy_provider::{
+    ext::{DebugApi, TraceApi},
+    Provider,
+};
 use alloy_rpc_types::{
-    request::TransactionRequest, AccessListWithGasUsed, Block, BlockId,
-    BlockNumberOrTag as BlockNumber, BlockTransactions, EIP1186AccountProofResponse, FeeHistory,
-    Filter, Log, Transaction, WithOtherFields,
+    request::TransactionRequest,
+    trace::{
+        geth::{GethDebugTracingOptions, GethTrace},
+        parity::LocalizedTransactionTrace as Trace,
+    },
+    AccessListWithGasUsed, Block, BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions,
+    EIP1186AccountProofResponse, FeeHistory, Filter, Log, Transaction,
 };
-use alloy_rpc_types_trace::{
-    geth::{GethDebugTracingOptions, GethTrace},
-    parity::LocalizedTransactionTrace as Trace,
-};
+use alloy_serde::WithOtherFields;
 use alloy_transport::TransportError;
 use anvil_core::eth::transaction::{convert_to_anvil_receipt, ReceiptResponse};
 use foundry_common::provider::{ProviderBuilder, RetryProvider};
@@ -38,8 +42,6 @@ pub struct ClientFork {
     /// This also holds a handle to the underlying database
     pub database: Arc<AsyncRwLock<Box<dyn Db>>>,
 }
-
-// === impl ClientFork ===
 
 impl ClientFork {
     /// Creates a new instance of the fork
@@ -74,8 +76,10 @@ impl ClientFork {
         }
 
         let provider = self.provider();
-        let block =
-            provider.get_block(block_number, false).await?.ok_or(BlockchainError::BlockNotFound)?;
+        let block = provider
+            .get_block(block_number, false.into())
+            .await?
+            .ok_or(BlockchainError::BlockNotFound)?;
         let block_hash = block.header.hash.ok_or(BlockchainError::BlockNotFound)?;
         let timestamp = block.header.timestamp;
         let base_fee = block.header.base_fee_per_gas;
@@ -112,6 +116,11 @@ impl ClientFork {
 
     pub fn block_number(&self) -> u64 {
         self.config.read().block_number
+    }
+
+    /// Returns the transaction hash we forked off of, if any.
+    pub fn transaction_hash(&self) -> Option<B256> {
+        self.config.read().transaction_hash
     }
 
     pub fn total_difficulty(&self) -> U256 {
@@ -185,7 +194,7 @@ impl ClientFork {
         block: Option<BlockNumber>,
     ) -> Result<u128, TransportError> {
         let block = block.unwrap_or_default();
-        let res = self.provider().estimate_gas(request).block_id(block.into()).await?;
+        let res = self.provider().estimate_gas(request).block(block.into()).await?;
 
         Ok(res)
     }
@@ -481,7 +490,7 @@ impl ClientFork {
         &self,
         block_id: impl Into<BlockId>,
     ) -> Result<Option<Block>, TransportError> {
-        if let Some(block) = self.provider().get_block(block_id.into(), true).await? {
+        if let Some(block) = self.provider().get_block(block_id.into(), true.into()).await? {
             let hash = block.header.hash.unwrap();
             let block_number = block.header.number.unwrap();
             let mut storage = self.storage_write();
@@ -575,6 +584,8 @@ pub struct ClientForkConfig {
     pub block_number: u64,
     /// The hash of the forked block
     pub block_hash: B256,
+    /// The transaction hash we forked off of, if any.
+    pub transaction_hash: Option<B256>,
     // TODO make provider agnostic
     pub provider: Arc<RetryProvider>,
     pub chain_id: u64,
@@ -597,9 +608,9 @@ pub struct ClientForkConfig {
     pub compute_units_per_second: u64,
     /// total difficulty of the chain until this block
     pub total_difficulty: U256,
+    /// Transactions to force include in the forked chain
+    pub force_transactions: Option<Vec<PoolTransaction>>,
 }
-
-// === impl ClientForkConfig ===
 
 impl ClientForkConfig {
     /// Updates the provider URL
@@ -658,8 +669,6 @@ pub struct ForkedStorage {
     pub block_receipts: HashMap<u64, Vec<ReceiptResponse>>,
     pub code_at: HashMap<(Address, u64), Bytes>,
 }
-
-// === impl ForkedStorage ===
 
 impl ForkedStorage {
     /// Clears all data

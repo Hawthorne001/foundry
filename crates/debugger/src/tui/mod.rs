@@ -8,7 +8,7 @@ use crossterm::{
 };
 use eyre::Result;
 use foundry_common::{compile::ContractSources, evm::Breakpoints};
-use foundry_evm_core::{debug::DebugNodeFlat, utils::PcIcMap};
+use foundry_evm_core::utils::PcIcMap;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
@@ -28,6 +28,8 @@ pub use builder::DebuggerBuilder;
 mod context;
 use context::DebuggerContext;
 
+use crate::DebugNode;
+
 mod draw;
 
 type DebuggerTerminal = Terminal<CrosstermBackend<io::Stdout>>;
@@ -41,7 +43,7 @@ pub enum ExitReason {
 
 /// The TUI debugger.
 pub struct Debugger {
-    debug_arena: Vec<DebugNodeFlat>,
+    debug_arena: Vec<DebugNode>,
     identified_contracts: HashMap<Address, String>,
     /// Source map of contract sources
     contracts_sources: ContractSources,
@@ -59,19 +61,19 @@ impl Debugger {
 
     /// Creates a new debugger.
     pub fn new(
-        debug_arena: Vec<DebugNodeFlat>,
+        debug_arena: Vec<DebugNode>,
         identified_contracts: HashMap<Address, String>,
         contracts_sources: ContractSources,
         breakpoints: Breakpoints,
     ) -> Self {
         let pc_ic_maps = contracts_sources
             .entries()
-            .filter_map(|(contract_name, _, contract)| {
+            .filter_map(|(name, artifact, _)| {
                 Some((
-                    contract_name.to_owned(),
+                    name.to_owned(),
                     (
-                        PcIcMap::new(contract.bytecode.bytes()?),
-                        PcIcMap::new(contract.deployed_bytecode.bytes()?),
+                        PcIcMap::new(artifact.bytecode.bytecode.bytes()?),
+                        PcIcMap::new(artifact.bytecode.deployed_bytecode.bytes()?),
                     ),
                 ))
             })

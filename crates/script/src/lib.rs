@@ -1,4 +1,9 @@
+//! # foundry-script
+//!
+//! Smart contract scripting.
+
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[macro_use]
 extern crate tracing;
@@ -6,7 +11,7 @@ extern crate tracing;
 use self::transaction::AdditionalContract;
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_primitives::{Address, Bytes, Log, TxKind, U256};
+use alloy_primitives::{hex, Address, Bytes, Log, TxKind, U256};
 use alloy_signer::Signer;
 use broadcast::next_nonce;
 use build::PreprocessedState;
@@ -17,7 +22,6 @@ use forge_verify::RetryArgs;
 use foundry_cli::{opts::CoreBuildArgs, utils::LoadConfig};
 use foundry_common::{
     abi::{encode_function_args, get_func},
-    compile::SkipBuildFilter,
     evm::{Breakpoints, EvmArgs},
     shell, ContractsByArtifact, CONTRACT_MAX_SIZE, SELECTOR_LEN,
 };
@@ -33,7 +37,6 @@ use foundry_config::{
 use foundry_evm::{
     backend::Backend,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    debug::DebugArena,
     executors::ExecutorBuilder,
     inspectors::{
         cheatcodes::{BroadcastableTransactions, ScriptWallets},
@@ -175,12 +178,6 @@ pub struct ScriptArgs {
     )]
     pub with_gas_price: Option<U256>,
 
-    /// Skip building files whose names contain the given filter.
-    ///
-    /// `test` and `script` are aliases for `.t.sol` and `.s.sol`.
-    #[arg(long, num_args(1..))]
-    pub skip: Option<Vec<SkipBuildFilter>>,
-
     #[command(flatten)]
     pub opts: CoreBuildArgs,
 
@@ -196,8 +193,6 @@ pub struct ScriptArgs {
     #[command(flatten)]
     pub retry: RetryArgs,
 }
-
-// === impl ScriptArgs ===
 
 impl ScriptArgs {
     async fn preprocess(self) -> Result<PreprocessedState> {
@@ -239,7 +234,7 @@ impl ScriptArgs {
                 .await?;
 
             if pre_simulation.args.debug {
-                pre_simulation.run_debugger()?;
+                return pre_simulation.run_debugger()
             }
 
             if pre_simulation.args.json {
@@ -466,7 +461,6 @@ pub struct ScriptResult {
     pub success: bool,
     pub logs: Vec<Log>,
     pub traces: Traces,
-    pub debug: Option<Vec<DebugArena>>,
     pub gas_used: u64,
     pub labeled_addresses: HashMap<Address, String>,
     pub transactions: Option<BroadcastableTransactions>,
@@ -582,7 +576,8 @@ impl ScriptConfig {
         let mut builder = ExecutorBuilder::new()
             .inspectors(|stack| stack.trace(true))
             .spec(self.config.evm_spec_id())
-            .gas_limit(self.evm_opts.gas_limit());
+            .gas_limit(self.evm_opts.gas_limit())
+            .legacy_assertions(self.config.legacy_assertions);
 
         if let Some((known_contracts, script_wallets, target)) = cheats_data {
             builder = builder.inspectors(|stack| {

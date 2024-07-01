@@ -3,7 +3,7 @@
 use crate::abi::{Console, Vm};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Error, JsonAbi};
-use alloy_primitives::{Log, Selector};
+use alloy_primitives::{hex, Log, Selector};
 use alloy_sol_types::{SolCall, SolError, SolEventInterface, SolInterface, SolValue};
 use foundry_common::SELECTOR_LEN;
 use itertools::Itertools;
@@ -105,7 +105,7 @@ impl RevertDecoder {
 
     /// Tries to decode an error message from the given revert bytes.
     ///
-    /// See [`decode_revert`] for more information.
+    /// See [`decode`](Self::decode) for more information.
     pub fn maybe_decode(&self, err: &[u8], status: Option<InstructionResult>) -> Option<String> {
         if err.len() < SELECTOR_LEN {
             if let Some(status) = status {

@@ -11,7 +11,6 @@ use foundry_compilers::{
 use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
 use foundry_debugger::Debugger;
 use foundry_evm::{
-    debug::DebugArena,
     executors::{DeployResult, EvmError, RawCallResult},
     opts::EvmOpts,
     traces::{
@@ -34,10 +33,10 @@ pub fn remove_contract(
     path: &Path,
     name: &str,
 ) -> Result<(JsonAbi, CompactBytecode, CompactDeployedBytecode)> {
-    let contract = if let Some(contract) = output.remove(path.to_string_lossy(), name) {
+    let contract = if let Some(contract) = output.remove(path, name) {
         contract
     } else {
-        let mut err = format!("could not find artifact: `{}`", name);
+        let mut err = format!("could not find artifact: `{name}`");
         if let Some(suggestion) =
             super::did_you_mean(name, output.artifacts().map(|(name, _)| name)).pop()
         {
@@ -146,7 +145,7 @@ pub fn init_progress(len: u64, label: &str) -> indicatif::ProgressBar {
     let mut template =
         "{prefix}{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} "
             .to_string();
-    write!(template, "{}", label).unwrap();
+    write!(template, "{label}").unwrap();
     template += " ({eta})";
     pb.set_style(
         indicatif::ProgressStyle::with_template(&template)
@@ -192,7 +191,7 @@ pub fn has_batch_support(chain_id: u64) -> bool {
 /// Helpers for loading configuration.
 ///
 /// This is usually implicitly implemented on a "&CmdArgs" struct via impl macros defined in
-/// `forge_config` (See [`forge_config::impl_figment_convert`] for more details) and the impl
+/// `forge_config` (see [`foundry_config::impl_figment_convert`] for more details) and the impl
 /// definition on `T: Into<Config> + Into<Figment>` below.
 ///
 /// Each function also has an `emit_warnings` form which does the same thing as its counterpart but
@@ -265,31 +264,31 @@ where
 
     fn load_config_emit_warnings(self) -> Config {
         let config = self.load_config();
-        config.__warnings.iter().for_each(|w| cli_warn!("{w}"));
+        config.warnings.iter().for_each(|w| cli_warn!("{w}"));
         config
     }
 
     fn try_load_config_emit_warnings(self) -> Result<Config, ExtractConfigError> {
         let config = self.try_load_config()?;
-        config.__warnings.iter().for_each(|w| cli_warn!("{w}"));
+        config.warnings.iter().for_each(|w| cli_warn!("{w}"));
         Ok(config)
     }
 
     fn load_config_and_evm_opts_emit_warnings(self) -> Result<(Config, EvmOpts)> {
         let (config, evm_opts) = self.load_config_and_evm_opts()?;
-        config.__warnings.iter().for_each(|w| cli_warn!("{w}"));
+        config.warnings.iter().for_each(|w| cli_warn!("{w}"));
         Ok((config, evm_opts))
     }
 
     fn load_config_unsanitized_emit_warnings(self) -> Config {
         let config = self.load_config_unsanitized();
-        config.__warnings.iter().for_each(|w| cli_warn!("{w}"));
+        config.warnings.iter().for_each(|w| cli_warn!("{w}"));
         config
     }
 
     fn try_load_config_unsanitized_emit_warnings(self) -> Result<Config, ExtractConfigError> {
         let config = self.try_load_config_unsanitized()?;
-        config.__warnings.iter().for_each(|w| cli_warn!("{w}"));
+        config.warnings.iter().for_each(|w| cli_warn!("{w}"));
         Ok(config)
     }
 }
@@ -315,20 +314,14 @@ pub fn read_constructor_args_file(constructor_args_path: PathBuf) -> Result<Vec<
 pub struct TraceResult {
     pub success: bool,
     pub traces: Option<Traces>,
-    pub debug: Option<DebugArena>,
     pub gas_used: u64,
 }
 
 impl TraceResult {
     /// Create a new [`TraceResult`] from a [`RawCallResult`].
     pub fn from_raw(raw: RawCallResult, trace_kind: TraceKind) -> Self {
-        let RawCallResult { gas_used, traces, reverted, debug, .. } = raw;
-        Self {
-            success: !reverted,
-            traces: traces.map(|arena| vec![(trace_kind, arena)]),
-            debug,
-            gas_used,
-        }
+        let RawCallResult { gas_used, traces, reverted, .. } = raw;
+        Self { success: !reverted, traces: traces.map(|arena| vec![(trace_kind, arena)]), gas_used }
     }
 }
 
@@ -391,7 +384,7 @@ pub async fn handle_traces(
             Default::default()
         };
         let mut debugger = Debugger::builder()
-            .debug_arena(result.debug.as_ref().expect("missing debug arena"))
+            .traces(result.traces.expect("missing traces"))
             .decoder(&decoder)
             .sources(sources)
             .build();

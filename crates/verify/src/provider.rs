@@ -9,7 +9,8 @@ use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
     artifacts::{output_selection::OutputSelection, Metadata, Source},
     compilers::{multi::MultiCompilerParsedSource, solc::SolcCompiler, CompilerSettings},
-    Graph, Project, Solc,
+    solc::Solc,
+    Graph, Project,
 };
 use foundry_config::Config;
 use semver::Version;
@@ -54,7 +55,7 @@ impl VerificationContext {
             .compile(&project)?;
 
         let artifact = output
-            .find(self.target_path.to_string_lossy(), &self.target_name)
+            .find(&self.target_path, &self.target_name)
             .ok_or_eyre("failed to find target artifact when compiling for abi")?;
 
         artifact.abi.clone().ok_or_eyre("target artifact does not have an ABI")
@@ -73,7 +74,7 @@ impl VerificationContext {
             .compile(&project)?;
 
         let artifact = output
-            .find(self.target_path.to_string_lossy(), &self.target_name)
+            .find(&self.target_path, &self.target_name)
             .ok_or_eyre("failed to find target artifact when compiling for metadata")?;
 
         artifact.metadata.clone().ok_or_eyre("target artifact does not have an ABI")
@@ -118,10 +119,10 @@ impl FromStr for VerificationProviderType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "e" | "etherscan" => Ok(VerificationProviderType::Etherscan),
-            "s" | "sourcify" => Ok(VerificationProviderType::Sourcify),
-            "b" | "blockscout" => Ok(VerificationProviderType::Blockscout),
-            "o" | "oklink" => Ok(VerificationProviderType::Oklink),
+            "e" | "etherscan" => Ok(Self::Etherscan),
+            "s" | "sourcify" => Ok(Self::Sourcify),
+            "b" | "blockscout" => Ok(Self::Blockscout),
+            "o" | "oklink" => Ok(Self::Oklink),
             _ => Err(format!("Unknown provider: {s}")),
         }
     }
@@ -130,16 +131,16 @@ impl FromStr for VerificationProviderType {
 impl fmt::Display for VerificationProviderType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VerificationProviderType::Etherscan => {
+            Self::Etherscan => {
                 write!(f, "etherscan")?;
             }
-            VerificationProviderType::Sourcify => {
+            Self::Sourcify => {
                 write!(f, "sourcify")?;
             }
-            VerificationProviderType::Blockscout => {
+            Self::Blockscout => {
                 write!(f, "blockscout")?;
             }
-            VerificationProviderType::Oklink => {
+            Self::Oklink => {
                 write!(f, "oklink")?;
             }
         };
@@ -160,19 +161,15 @@ impl VerificationProviderType {
     /// Returns the corresponding `VerificationProvider` for the key
     pub fn client(&self, key: &Option<String>) -> Result<Box<dyn VerificationProvider>> {
         match self {
-            VerificationProviderType::Etherscan => {
+            Self::Etherscan => {
                 if key.as_ref().map_or(true, |key| key.is_empty()) {
                     eyre::bail!("ETHERSCAN_API_KEY must be set")
                 }
                 Ok(Box::<EtherscanVerificationProvider>::default())
             }
-            VerificationProviderType::Sourcify => {
-                Ok(Box::<SourcifyVerificationProvider>::default())
-            }
-            VerificationProviderType::Blockscout => {
-                Ok(Box::<EtherscanVerificationProvider>::default())
-            }
-            VerificationProviderType::Oklink => Ok(Box::<EtherscanVerificationProvider>::default()),
+            Self::Sourcify => Ok(Box::<SourcifyVerificationProvider>::default()),
+            Self::Blockscout => Ok(Box::<EtherscanVerificationProvider>::default()),
+            Self::Oklink => Ok(Box::<EtherscanVerificationProvider>::default()),
         }
     }
 }

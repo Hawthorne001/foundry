@@ -4,10 +4,11 @@ use crate::{
 };
 use alloy_chains::Chain;
 use alloy_eips::eip2718::Encodable2718;
-use alloy_network::{AnyNetwork, EthereumSigner, TransactionBuilder};
+use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{utils::format_units, Address, TxHash};
 use alloy_provider::{utils::Eip1559Estimation, Provider};
-use alloy_rpc_types::{TransactionRequest, WithOtherFields};
+use alloy_rpc_types::TransactionRequest;
+use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
 use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
@@ -102,7 +103,7 @@ pub async fn send_transaction(
 #[derive(Clone)]
 pub enum SendTransactionKind<'a> {
     Unlocked(Address),
-    Raw(&'a EthereumSigner),
+    Raw(&'a EthereumWallet),
 }
 
 /// Represents how to send _all_ transactions
@@ -110,7 +111,7 @@ pub enum SendTransactionsKind {
     /// Send via `eth_sendTransaction` and rely on the  `from` address being unlocked.
     Unlocked(HashSet<Address>),
     /// Send a signed transaction via `eth_sendRawTransaction`
-    Raw(HashMap<Address, EthereumSigner>),
+    Raw(HashMap<Address, EthereumWallet>),
 }
 
 impl SendTransactionsKind {
@@ -119,13 +120,13 @@ impl SendTransactionsKind {
     /// Returns an error if no matching signer is found or the address is not unlocked
     pub fn for_sender(&self, addr: &Address) -> Result<SendTransactionKind<'_>> {
         match self {
-            SendTransactionsKind::Unlocked(unlocked) => {
+            Self::Unlocked(unlocked) => {
                 if !unlocked.contains(addr) {
                     bail!("Sender address {:?} is not unlocked", addr)
                 }
                 Ok(SendTransactionKind::Unlocked(*addr))
             }
-            SendTransactionsKind::Raw(wallets) => {
+            Self::Raw(wallets) => {
                 if let Some(wallet) = wallets.get(addr) {
                     Ok(SendTransactionKind::Raw(wallet))
                 } else {
@@ -138,14 +139,15 @@ impl SendTransactionsKind {
     /// How many signers are set
     pub fn signers_count(&self) -> usize {
         match self {
-            SendTransactionsKind::Unlocked(addr) => addr.len(),
-            SendTransactionsKind::Raw(signers) => signers.len(),
+            Self::Unlocked(addr) => addr.len(),
+            Self::Raw(signers) => signers.len(),
         }
     }
 }
 
-/// State after we have bundled all [TransactionWithMetadata] objects into a single
-/// [ScriptSequenceKind] object containing one or more script sequences.
+/// State after we have bundled all
+/// [`TransactionWithMetadata`](crate::transaction::TransactionWithMetadata) objects into a single
+/// [`ScriptSequenceKind`] object containing one or more script sequences.
 pub struct BundledState {
     pub args: ScriptArgs,
     pub script_config: ScriptConfig,
@@ -222,7 +224,7 @@ impl BundledState {
 
             let signers = signers
                 .into_iter()
-                .map(|(addr, signer)| (addr, EthereumSigner::new(signer)))
+                .map(|(addr, signer)| (addr, EthereumWallet::new(signer)))
                 .collect();
 
             SendTransactionsKind::Raw(signers)

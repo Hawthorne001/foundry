@@ -9,25 +9,27 @@ use crate::{
             time::duration_since_unix_epoch,
         },
         fees::{INITIAL_BASE_FEE, INITIAL_GAS_PRICE},
-        pool::transactions::TransactionOrder,
+        pool::transactions::{PoolTransaction, TransactionOrder},
     },
     mem::{self, in_memory_db::MemDb},
     FeeManager, Hardfork, PrecompileFactory,
 };
 use alloy_genesis::Genesis;
 use alloy_network::AnyNetwork;
-use alloy_primitives::{hex, utils::Unit, U256};
+use alloy_primitives::{hex, utils::Unit, BlockNumber, TxHash, U256};
 use alloy_provider::Provider;
-use alloy_rpc_types::BlockNumberOrTag;
+use alloy_rpc_types::{BlockNumberOrTag, Transaction};
 use alloy_signer::Signer;
-use alloy_signer_wallet::{
+use alloy_signer_local::{
     coins_bip39::{English, Mnemonic},
-    LocalWallet, MnemonicBuilder,
+    MnemonicBuilder, PrivateKeySigner,
 };
 use alloy_transport::{Transport, TransportError};
 use anvil_server::ServerConfig;
+use eyre::Result;
 use foundry_common::{
-    provider::ProviderBuilder, ALCHEMY_FREE_TIER_CUPS, NON_ARCHIVE_NODE_WARNING, REQUEST_TIMEOUT,
+    provider::{ProviderBuilder, RetryProvider},
+    ALCHEMY_FREE_TIER_CUPS, NON_ARCHIVE_NODE_WARNING, REQUEST_TIMEOUT,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -36,6 +38,7 @@ use foundry_evm::{
     revm::primitives::{BlockEnv, CfgEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, SpecId, TxEnv},
     utils::apply_chain_and_block_specific_env_changes,
 };
+use itertools::Itertools;
 use parking_lot::RwLock;
 use rand::thread_rng;
 use revm::primitives::BlobExcessGasAndPrice;
@@ -99,13 +102,13 @@ pub struct NodeConfig {
     /// The hardfork to use
     pub hardfork: Option<Hardfork>,
     /// Signer accounts that will be initialised with `genesis_balance` in the genesis block
-    pub genesis_accounts: Vec<LocalWallet>,
+    pub genesis_accounts: Vec<PrivateKeySigner>,
     /// Native token balance of every genesis account in the genesis block
     pub genesis_balance: U256,
     /// Genesis block timestamp
     pub genesis_timestamp: Option<u64>,
     /// Signer accounts that can sign messages/transactions from the EVM node
-    pub signer_accounts: Vec<LocalWallet>,
+    pub signer_accounts: Vec<PrivateKeySigner>,
     /// Configured block time for the EVM chain. Use `None` to mine a new block for every tx
     pub block_time: Option<Duration>,
     /// Disable auto, interval mining mode uns use `MiningMode::None` instead
@@ -118,8 +121,8 @@ pub struct NodeConfig {
     pub silent: bool,
     /// url of the rpc server that should be used for any rpc calls
     pub eth_rpc_url: Option<String>,
-    /// pins the block number for the state fork
-    pub fork_block_number: Option<u64>,
+    /// pins the block number or transaction hash for the state fork
+    pub fork_choice: Option<ForkChoice>,
     /// headers to use with `eth_rpc_url`
     pub fork_headers: Vec<String>,
     /// specifies chain id for cache to skip fetching from remote in offline-start mode
@@ -206,7 +209,7 @@ Private Keys
         );
 
         for (idx, wallet) in self.genesis_accounts.iter().enumerate() {
-            let hex = hex::encode(wallet.signer().to_bytes());
+            let hex = hex::encode(wallet.credential().to_bytes());
             let _ = write!(config_string, "\n({idx}) 0x{hex}");
         }
 
@@ -242,6 +245,10 @@ Chain ID:       {}
                 fork.block_hash(),
                 fork.chain_id()
             );
+
+            if let Some(tx_hash) = fork.transaction_hash() {
+                let _ = writeln!(config_string, "Transaction hash: {tx_hash}");
+            }
         } else {
             let _ = write!(
                 config_string,
@@ -312,7 +319,7 @@ Genesis Timestamp
 
         for wallet in &self.genesis_accounts {
             available_accounts.push(format!("{:?}", wallet.address()));
-            private_keys.push(format!("0x{}", hex::encode(wallet.signer().to_bytes())));
+            private_keys.push(format!("0x{}", hex::encode(wallet.credential().to_bytes())));
         }
 
         if let Some(ref gen) = self.account_generator {
@@ -349,8 +356,6 @@ Genesis Timestamp
         }
     }
 }
-
-// === impl NodeConfig ===
 
 impl NodeConfig {
     /// Returns a new config intended to be used in tests, which does not print and binds to a
@@ -393,7 +398,7 @@ impl Default for NodeConfig {
             max_transactions: 1_000,
             silent: false,
             eth_rpc_url: None,
-            fork_block_number: None,
+            fork_choice: None,
             account_generator: None,
             base_fee: None,
             blob_excess_gas_and_price: None,
@@ -590,14 +595,14 @@ impl NodeConfig {
 
     /// Sets the genesis accounts
     #[must_use]
-    pub fn with_genesis_accounts(mut self, accounts: Vec<LocalWallet>) -> Self {
+    pub fn with_genesis_accounts(mut self, accounts: Vec<PrivateKeySigner>) -> Self {
         self.genesis_accounts = accounts;
         self
     }
 
     /// Sets the signer accounts
     #[must_use]
-    pub fn with_signer_accounts(mut self, accounts: Vec<LocalWallet>) -> Self {
+    pub fn with_signer_accounts(mut self, accounts: Vec<PrivateKeySigner>) -> Self {
         self.signer_accounts = accounts;
         self
     }
@@ -696,10 +701,25 @@ impl NodeConfig {
         self
     }
 
-    /// Sets the `fork_block_number` to use to fork off from
+    /// Sets the `fork_choice` to use to fork off from based on a block number
     #[must_use]
-    pub fn with_fork_block_number<U: Into<u64>>(mut self, fork_block_number: Option<U>) -> Self {
-        self.fork_block_number = fork_block_number.map(Into::into);
+    pub fn with_fork_block_number<U: Into<u64>>(self, fork_block_number: Option<U>) -> Self {
+        self.with_fork_choice(fork_block_number.map(Into::into))
+    }
+
+    /// Sets the `fork_choice` to use to fork off from based on a transaction hash
+    #[must_use]
+    pub fn with_fork_transaction_hash<U: Into<TxHash>>(
+        self,
+        fork_transaction_hash: Option<U>,
+    ) -> Self {
+        self.with_fork_choice(fork_transaction_hash.map(Into::into))
+    }
+
+    /// Sets the `fork_choice` to use to fork off from
+    #[must_use]
+    pub fn with_fork_choice<U: Into<ForkChoice>>(mut self, fork_choice: Option<U>) -> Self {
+        self.fork_choice = fork_choice.map(Into::into);
         self
     }
 
@@ -953,9 +973,9 @@ impl NodeConfig {
     }
 
     /// Configures everything related to forking based on the passed `eth_rpc_url`:
-    ///  - returning a tuple of a [ForkedDatabase](ForkedDatabase) wrapped in an [Arc](Arc)
-    ///    [RwLock](tokio::sync::RwLock) and [ClientFork](ClientFork) wrapped in an [Option](Option)
-    ///    which can be used in a [Backend](mem::Backend) to fork from.
+    ///  - returning a tuple of a [ForkedDatabase] wrapped in an [Arc] [RwLock](tokio::sync::RwLock)
+    ///    and [ClientFork] wrapped in an [Option] which can be used in a [Backend](mem::Backend) to
+    ///    fork from.
     ///  - modifying some parameters of the passed `env`
     ///  - mutating some members of `self`
     pub async fn setup_fork_db(
@@ -975,9 +995,8 @@ impl NodeConfig {
     }
 
     /// Configures everything related to forking based on the passed `eth_rpc_url`:
-    ///  - returning a tuple of a [ForkedDatabase](ForkedDatabase) and
-    ///    [ClientForkConfig](ClientForkConfig) which can be used to build a
-    ///    [ClientFork](ClientFork) to fork from.
+    ///  - returning a tuple of a [ForkedDatabase] and [ClientForkConfig] which can be used to build
+    ///    a [ClientFork] to fork from.
     ///  - modifying some parameters of the passed `env`
     ///  - mutating some members of `self`
     pub async fn setup_fork_db_config(
@@ -1000,9 +1019,13 @@ impl NodeConfig {
                 .expect("Failed to establish provider to fork url"),
         );
 
-        let (fork_block_number, fork_chain_id) = if let Some(fork_block_number) =
-            self.fork_block_number
+        let (fork_block_number, fork_chain_id, force_transactions) = if let Some(fork_choice) =
+            &self.fork_choice
         {
+            let (fork_block_number, force_transactions) =
+                derive_block_and_transactions(fork_choice, &provider).await.expect(
+                    "Failed to derive fork block number and force transactions from fork choice",
+                );
             let chain_id = if let Some(chain_id) = self.fork_chain_id {
                 Some(chain_id)
             } else if self.hardfork.is_none() {
@@ -1020,16 +1043,16 @@ impl NodeConfig {
                 None
             };
 
-            (fork_block_number, chain_id)
+            (fork_block_number, chain_id, force_transactions)
         } else {
             // pick the last block number but also ensure it's not pending anymore
             let bn =
                 find_latest_fork_block(&provider).await.expect("Failed to get fork block number");
-            (bn, None)
+            (bn, None, None)
         };
 
         let block = provider
-            .get_block(BlockNumberOrTag::Number(fork_block_number).into(), false)
+            .get_block(BlockNumberOrTag::Number(fork_block_number).into(), false.into())
             .await
             .expect("Failed to get fork block");
 
@@ -1045,7 +1068,7 @@ latest block number: {latest_block}"
                 // the block, and the block number is less than equal the latest block, then
                 // the user is forking from a non-archive node with an older block number.
                 if fork_block_number <= latest_block {
-                    message.push_str(&format!("\n{}", NON_ARCHIVE_NODE_WARNING));
+                    message.push_str(&format!("\n{NON_ARCHIVE_NODE_WARNING}"));
                 }
                 panic!("{}", message);
             }
@@ -1150,6 +1173,7 @@ latest block number: {latest_block}"
             eth_rpc_url,
             block_number: fork_block_number,
             block_hash,
+            transaction_hash: self.fork_choice.and_then(|fc| fc.transaction_hash()),
             provider,
             chain_id,
             override_chain_id,
@@ -1162,6 +1186,7 @@ latest block number: {latest_block}"
             total_difficulty: block.header.total_difficulty.unwrap_or_default(),
             blob_gas_used: block.header.blob_gas_used,
             blob_excess_gas_and_price: env.block.blob_excess_gas_and_price.clone(),
+            force_transactions,
         };
 
         let mut db = ForkedDatabase::new(backend, block_chain_db);
@@ -1173,13 +1198,95 @@ latest block number: {latest_block}"
     }
 }
 
+/// If the fork choice is a block number, simply return it with an empty list of transactions.
+/// If the fork choice is a transaction hash, determine the block that the transaction was mined in,
+/// and return the block number before the fork block along with all transactions in the fork block
+/// that are before (and including) the fork transaction.
+async fn derive_block_and_transactions(
+    fork_choice: &ForkChoice,
+    provider: &Arc<RetryProvider>,
+) -> eyre::Result<(BlockNumber, Option<Vec<PoolTransaction>>)> {
+    match fork_choice {
+        ForkChoice::Block(block_number) => Ok((block_number.to_owned(), None)),
+        ForkChoice::Transaction(transaction_hash) => {
+            // Determine the block that this transaction was mined in
+            let transaction = provider
+                .get_transaction_by_hash(transaction_hash.0.into())
+                .await?
+                .ok_or(eyre::eyre!("Failed to get fork transaction by hash"))?;
+            let transaction_block_number = transaction.block_number.unwrap();
+
+            // Get the block pertaining to the fork transaction
+            let transaction_block = provider
+                .get_block_by_number(transaction_block_number.into(), true)
+                .await?
+                .ok_or(eyre::eyre!("Failed to get fork block by number"))?;
+
+            // Filter out transactions that are after the fork transaction
+            let filtered_transactions: Vec<&Transaction> = transaction_block
+                .transactions
+                .as_transactions()
+                .ok_or(eyre::eyre!("Failed to get transactions from full fork block"))?
+                .iter()
+                .take_while_inclusive(|&transaction| transaction.hash != transaction_hash.0)
+                .collect();
+
+            // Convert the transactions to PoolTransactions
+            let force_transactions = filtered_transactions
+                .iter()
+                .map(|&transaction| PoolTransaction::try_from(transaction.clone()))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((transaction_block_number.saturating_sub(1), Some(force_transactions)))
+        }
+    }
+}
+
+/// Fork delimiter used to specify which block or transaction to fork from
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForkChoice {
+    /// Block number to fork from
+    Block(BlockNumber),
+    /// Transaction hash to fork from
+    Transaction(TxHash),
+}
+
+impl ForkChoice {
+    /// Returns the block number to fork from
+    pub fn block_number(&self) -> Option<BlockNumber> {
+        match self {
+            Self::Block(block_number) => Some(*block_number),
+            Self::Transaction(_) => None,
+        }
+    }
+
+    /// Returns the transaction hash to fork from
+    pub fn transaction_hash(&self) -> Option<TxHash> {
+        match self {
+            Self::Block(_) => None,
+            Self::Transaction(transaction_hash) => Some(*transaction_hash),
+        }
+    }
+}
+
+/// Convert a transaction hash into a ForkChoice
+impl From<TxHash> for ForkChoice {
+    fn from(tx_hash: TxHash) -> Self {
+        Self::Transaction(tx_hash)
+    }
+}
+
+/// Convert a decimal block number into a ForkChoice
+impl From<u64> for ForkChoice {
+    fn from(block: u64) -> Self {
+        Self::Block(block)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PruneStateHistoryConfig {
     pub enabled: bool,
     pub max_memory_history: Option<usize>,
 }
-
-// === impl PruneStateHistoryConfig ===
 
 impl PruneStateHistoryConfig {
     /// Returns `true` if writing state history is supported
@@ -1248,7 +1355,7 @@ impl AccountGenerator {
 }
 
 impl AccountGenerator {
-    pub fn gen(&self) -> Vec<LocalWallet> {
+    pub fn gen(&self) -> Vec<PrivateKeySigner> {
         let builder = MnemonicBuilder::<English>::default().phrase(self.phrase.as_str());
 
         // use the derivation path
@@ -1287,7 +1394,7 @@ async fn find_latest_fork_block<P: Provider<T, AnyNetwork>, T: Transport + Clone
     // walk back from the head of the chain, but at most 2 blocks, which should be more than enough
     // leeway
     for _ in 0..2 {
-        if let Some(block) = provider.get_block(num.into(), false).await? {
+        if let Some(block) = provider.get_block(num.into(), false.into()).await? {
             if block.header.hash.is_some() {
                 break;
             }

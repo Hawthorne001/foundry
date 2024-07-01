@@ -611,6 +611,12 @@ interface Vm {
     #[cheatcode(group = Evm, safety = Safe)]
     function rpc(string calldata method, string calldata params) external returns (bytes memory data);
 
+    /// Performs an Ethereum JSON-RPC request to the given endpoint.
+    #[cheatcode(group = Evm, safety = Safe)]
+    function rpc(string calldata urlOrAlias, string calldata method, string calldata params)
+        external
+        returns (bytes memory data);
+
     /// Gets all the logs according to specified filter.
     #[cheatcode(group = Evm, safety = Safe)]
     function eth_getLogs(uint256 fromBlock, uint256 toBlock, address target, bytes32[] memory topics)
@@ -1474,6 +1480,18 @@ interface Vm {
     #[cheatcode(group = Filesystem)]
     function getCode(string calldata artifactPath) external view returns (bytes memory creationBytecode);
 
+    /// Deploys a contract from an artifact file. Takes in the relative path to the json file or the path to the
+    /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
+    #[cheatcode(group = Filesystem)]
+    function deployCode(string calldata artifactPath) external returns (address deployedAddress);
+
+    /// Deploys a contract from an artifact file. Takes in the relative path to the json file or the path to the
+    /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
+    ///
+    /// Additionaly accepts abi-encoded constructor arguments.
+    #[cheatcode(group = Filesystem)]
+    function deployCode(string calldata artifactPath, bytes calldata constructorArgs) external returns (address deployedAddress);
+
     /// Gets the deployed bytecode from an artifact file. Takes in the relative path to the json file or the path to the
     /// artifact in the form of <path>:<contract>:<version> where <contract> and <version> parts are optional.
     #[cheatcode(group = Filesystem)]
@@ -1498,6 +1516,10 @@ interface Vm {
     /// Prompts the user for a hidden string value in the terminal.
     #[cheatcode(group = Filesystem)]
     function promptSecret(string calldata promptText) external returns (string memory input);
+
+    /// Prompts the user for hidden uint256 in the terminal (usually pk).
+    #[cheatcode(group = Filesystem)]
+    function promptSecretUint(string calldata promptText) external returns (uint256);
 
     /// Prompts the user for an address in the terminal.
     #[cheatcode(group = Filesystem)]
@@ -2144,7 +2166,7 @@ interface Vm {
     #[cheatcode(group = Utilities)]
     function randomUint() external returns (uint256);
 
-    /// Returns random uin256 value between the provided range (min..=max).
+    /// Returns random uin256 value between the provided range (=min..=max).
     #[cheatcode(group = Utilities)]
     function randomUint(uint256 min, uint256 max) external returns (uint256);
 
@@ -2159,23 +2181,19 @@ impl PartialEq for ForgeContext {
     // and script group case (any of dry run, broadcast or resume).
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (_, &ForgeContext::TestGroup) => {
-                self == &ForgeContext::Test ||
-                    self == &ForgeContext::Snapshot ||
-                    self == &ForgeContext::Coverage
+            (_, Self::TestGroup) => {
+                matches!(self, Self::Test | Self::Snapshot | Self::Coverage)
             }
-            (_, &ForgeContext::ScriptGroup) => {
-                self == &ForgeContext::ScriptDryRun ||
-                    self == &ForgeContext::ScriptBroadcast ||
-                    self == &ForgeContext::ScriptResume
+            (_, Self::ScriptGroup) => {
+                matches!(self, Self::ScriptDryRun | Self::ScriptBroadcast | Self::ScriptResume)
             }
-            (&ForgeContext::Test, &ForgeContext::Test) |
-            (&ForgeContext::Snapshot, &ForgeContext::Snapshot) |
-            (&ForgeContext::Coverage, &ForgeContext::Coverage) |
-            (&ForgeContext::ScriptDryRun, &ForgeContext::ScriptDryRun) |
-            (&ForgeContext::ScriptBroadcast, &ForgeContext::ScriptBroadcast) |
-            (&ForgeContext::ScriptResume, &ForgeContext::ScriptResume) |
-            (&ForgeContext::Unknown, &ForgeContext::Unknown) => true,
+            (Self::Test, Self::Test) |
+            (Self::Snapshot, Self::Snapshot) |
+            (Self::Coverage, Self::Coverage) |
+            (Self::ScriptDryRun, Self::ScriptDryRun) |
+            (Self::ScriptBroadcast, Self::ScriptBroadcast) |
+            (Self::ScriptResume, Self::ScriptResume) |
+            (Self::Unknown, Self::Unknown) => true,
             _ => false,
         }
     }

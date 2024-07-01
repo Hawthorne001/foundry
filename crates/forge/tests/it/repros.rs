@@ -292,7 +292,7 @@ test_repro!(6538);
 
 // https://github.com/foundry-rs/foundry/issues/6554
 test_repro!(6554; |config| {
-    let path = config.runner.config.__root.0.join("out/default/Issue6554.t.sol");
+    let path = config.runner.config.root.0.join("out/default/Issue6554.t.sol");
 
     let mut prj_config = Config::clone(&config.runner.config);
     prj_config.fs_permissions.add(PathPermission::read_write(path));
@@ -329,3 +329,22 @@ test_repro!(7481);
 
 // https://github.com/foundry-rs/foundry/issues/5739
 test_repro!(5739);
+
+// https://github.com/foundry-rs/foundry/issues/8004
+test_repro!(8004);
+
+// https://github.com/foundry-rs/foundry/issues/2851
+test_repro!(2851, false, None, |res| {
+    let mut res = res.remove("default/repros/Issue2851.t.sol:Issue2851Test").unwrap();
+    let test = res.test_results.remove("invariantNotZero()").unwrap();
+    assert_eq!(test.status, TestStatus::Failure);
+});
+
+// https://github.com/foundry-rs/foundry/issues/8006
+test_repro!(8006);
+
+// https://github.com/foundry-rs/foundry/issues/8277
+test_repro!(8277);
+
+// https://github.com/foundry-rs/foundry/issues/8287
+test_repro!(8287);

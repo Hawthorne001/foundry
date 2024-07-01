@@ -1,11 +1,11 @@
 use crate::{
-    config::DEFAULT_MNEMONIC,
+    config::{ForkChoice, DEFAULT_MNEMONIC},
     eth::{backend::db::SerializableState, pool::transactions::TransactionOrder, EthApi},
     AccountGenerator, Hardfork, NodeConfig, CHAIN_ID,
 };
 use alloy_genesis::Genesis;
-use alloy_primitives::{utils::Unit, U256};
-use alloy_signer_wallet::coins_bip39::{English, Mnemonic};
+use alloy_primitives::{utils::Unit, B256, U256};
+use alloy_signer_local::coins_bip39::{English, Mnemonic};
 use anvil_server::ServerConfig;
 use clap::Parser;
 use core::fmt;
@@ -204,10 +204,14 @@ impl NodeArgs {
             .with_genesis_balance(genesis_balance)
             .with_genesis_timestamp(self.timestamp)
             .with_port(self.port)
-            .with_fork_block_number(
-                self.evm_opts
-                    .fork_block_number
-                    .or_else(|| self.evm_opts.fork_url.as_ref().and_then(|f| f.block)),
+            .with_fork_choice(
+                match (self.evm_opts.fork_block_number, self.evm_opts.fork_transaction_hash) {
+                    (Some(block), None) => Some(ForkChoice::Block(block)),
+                    (None, Some(hash)) => Some(ForkChoice::Transaction(hash)),
+                    _ => {
+                        self.evm_opts.fork_url.as_ref().and_then(|f| f.block).map(ForkChoice::Block)
+                    }
+                },
             )
             .with_fork_headers(self.evm_opts.fork_headers)
             .with_fork_chain_id(self.evm_opts.fork_chain_id.map(u64::from).map(U256::from))
@@ -394,6 +398,18 @@ pub struct AnvilEvmArgs {
     #[arg(long, requires = "fork_url", value_name = "BLOCK", help_heading = "Fork config")]
     pub fork_block_number: Option<u64>,
 
+    /// Fetch state from a specific transaction hash over a remote endpoint.
+    ///
+    /// See --fork-url.
+    #[arg(
+        long,
+        requires = "fork_url",
+        value_name = "TRANSACTION",
+        help_heading = "Fork config",
+        conflicts_with = "fork_block_number"
+    )]
+    pub fork_transaction_hash: Option<B256>,
+
     /// Initial retry backoff on encountering errors.
     ///
     /// See --fork-url.
@@ -417,8 +433,7 @@ pub struct AnvilEvmArgs {
     ///
     /// default value: 330
     ///
-    /// See --fork-url.
-    /// See also, https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second
+    /// See also --fork-url and <https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second>
     #[arg(
         long,
         requires = "fork_url",
@@ -432,8 +447,7 @@ pub struct AnvilEvmArgs {
     ///
     /// default value: false
     ///
-    /// See --fork-url.
-    /// See also, https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second
+    /// See also --fork-url and <https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second>
     #[arg(
         long,
         requires = "fork_url",
@@ -596,7 +610,7 @@ impl Future for PeriodicStateDumper {
             if this.interval.poll_tick(cx).is_ready() {
                 let api = this.api.clone();
                 let path = this.dump_state.clone().expect("exists; see above");
-                this.in_progress_dump = Some(Box::pin(PeriodicStateDumper::dump_state(api, path)));
+                this.in_progress_dump = Some(Box::pin(Self::dump_state(api, path)));
             } else {
                 break
             }
@@ -663,17 +677,17 @@ impl FromStr for ForkUrl {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((url, block)) = s.rsplit_once('@') {
             if block == "latest" {
-                return Ok(ForkUrl { url: url.to_string(), block: None })
+                return Ok(Self { url: url.to_string(), block: None })
             }
             // this will prevent false positives for auths `user:password@example.com`
             if !block.is_empty() && !block.contains(':') && !block.contains('.') {
                 let block: u64 = block
                     .parse()
                     .map_err(|_| format!("Failed to parse block number: `{block}`"))?;
-                return Ok(ForkUrl { url: url.to_string(), block: Some(block) })
+                return Ok(Self { url: url.to_string(), block: Some(block) })
             }
         }
-        Ok(ForkUrl { url: s.to_string(), block: None })
+        Ok(Self { url: s.to_string(), block: None })
     }
 }
 

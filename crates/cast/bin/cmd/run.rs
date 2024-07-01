@@ -9,7 +9,7 @@ use foundry_cli::{
     utils::{handle_traces, init_progress, TraceResult},
 };
 use foundry_common::{is_known_system_sender, SYSTEM_TRANSACTION_TYPE};
-use foundry_compilers::EvmVersion;
+use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{find_project_root_path, Config};
 use foundry_evm::{
     executors::{EvmError, TracingExecutor},
@@ -98,7 +98,7 @@ impl RunArgs {
         let tx = provider
             .get_transaction_by_hash(tx_hash)
             .await
-            .wrap_err_with(|| format!("tx not found: {:?}", tx_hash))?
+            .wrap_err_with(|| format!("tx not found: {tx_hash:?}"))?
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
         // check if the tx is a system transaction
@@ -113,7 +113,7 @@ impl RunArgs {
             tx.block_number.ok_or_else(|| eyre::eyre!("tx may still be pending: {:?}", tx_hash))?;
 
         // fetch the block the transaction was mined in
-        let block = provider.get_block(tx_block_number.into(), true).await?;
+        let block = provider.get_block(tx_block_number.into(), true.into()).await?;
 
         // we need to fork off the parent block
         config.fork_block_number = Some(tx_block_number - 1);
@@ -176,7 +176,7 @@ impl RunArgs {
 
                     if let Some(to) = tx.to {
                         trace!(tx=?tx.hash,?to, "executing previous call transaction");
-                        executor.commit_tx_with_env(env.clone()).wrap_err_with(|| {
+                        executor.transact_with_env(env.clone()).wrap_err_with(|| {
                             format!(
                                 "Failed to execute transaction: {:?} in block {}",
                                 tx.hash, env.block.number
@@ -213,7 +213,7 @@ impl RunArgs {
 
             if let Some(to) = tx.to {
                 trace!(tx=?tx.hash, to=?to, "executing call transaction");
-                TraceResult::from_raw(executor.commit_tx_with_env(env)?, TraceKind::Execution)
+                TraceResult::from_raw(executor.transact_with_env(env)?, TraceKind::Execution)
             } else {
                 trace!(tx=?tx.hash, "executing create transaction");
                 TraceResult::try_from(executor.deploy_with_env(env, None))?

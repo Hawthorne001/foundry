@@ -1,6 +1,5 @@
 use crate::{build::LinkedBuildData, sequence::ScriptSequenceKind, ScriptArgs, ScriptConfig};
-
-use alloy_primitives::Address;
+use alloy_primitives::{hex, Address};
 use eyre::Result;
 use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::opts::{EtherscanOpts, ProjectPathsArgs};
@@ -77,7 +76,7 @@ impl VerifyBundle {
 
         let via_ir = config.via_ir;
 
-        VerifyBundle {
+        Self {
             num_of_optimizations,
             known_contracts,
             etherscan: Default::default(),

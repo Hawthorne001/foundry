@@ -2,14 +2,14 @@ use crate::{
     abi::{Greeter, MulticallContract, SimpleStorage},
     utils::{connect_pubsub, http_provider_with_signer},
 };
-use alloy_network::{EthereumSigner, TransactionBuilder};
+use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, Bytes, FixedBytes, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{
     state::{AccountOverride, StateOverride},
     AccessList, AccessListItem, BlockId, BlockNumberOrTag, BlockTransactions, TransactionRequest,
-    WithOtherFields,
 };
+use alloy_serde::WithOtherFields;
 use anvil::{spawn, Hardfork, NodeConfig};
 use eyre::Ok;
 use futures::{future::join_all, FutureExt, StreamExt};
@@ -90,7 +90,7 @@ async fn can_order_transactions() {
     let lower_price = tx_lower.get_receipt().await.unwrap().transaction_hash;
 
     // get the block, await receipts
-    let block = provider.get_block(BlockId::latest(), false).await.unwrap().unwrap();
+    let block = provider.get_block(BlockId::latest(), false.into()).await.unwrap().unwrap();
 
     assert_eq!(block.transactions, BlockTransactions::Hashes(vec![higher_price, lower_price]))
 }
@@ -129,7 +129,7 @@ async fn can_respect_nonces() {
     // this will unblock the currently pending tx
     let higher_tx = higher_pending_tx.get_receipt().await.unwrap(); // Awaits endlessly here due to alloy/#389
 
-    let block = provider.get_block(1.into(), false).await.unwrap().unwrap();
+    let block = provider.get_block(1.into(), false.into()).await.unwrap().unwrap();
     assert_eq!(2, block.transactions.len());
     assert_eq!(
         BlockTransactions::Hashes(vec![tx.transaction_hash, higher_tx.transaction_hash]),
@@ -170,7 +170,7 @@ async fn can_replace_transaction() {
     // mine exactly one block
     api.mine_one().await;
 
-    let block = provider.get_block(1.into(), false).await.unwrap().unwrap();
+    let block = provider.get_block(1.into(), false.into()).await.unwrap().unwrap();
 
     assert_eq!(block.transactions.len(), 1);
     assert_eq!(BlockTransactions::Hashes(vec![higher_tx_hash]), block.transactions);
@@ -227,6 +227,28 @@ async fn can_reject_too_high_gas_limits() {
     let _ = pending.unwrap();
 }
 
+// <https://github.com/foundry-rs/foundry/issues/8094>
+#[tokio::test(flavor = "multi_thread")]
+async fn can_mine_large_gas_limit() {
+    let (api, handle) = spawn(NodeConfig::test().disable_block_gas_limit(true)).await;
+    let provider = handle.http_provider();
+
+    let accounts = handle.dev_wallets().collect::<Vec<_>>();
+    let from = accounts[0].address();
+    let to = accounts[1].address();
+
+    let gas_limit = api.gas_limit().to::<u128>();
+    let amount = handle.genesis_balance().checked_div(U256::from(3u64)).unwrap();
+
+    let tx =
+        TransactionRequest::default().to(to).value(amount).from(from).with_gas_limit(gas_limit * 3);
+
+    // send transaction with higher gas limit
+    let pending = provider.send_transaction(WithOtherFields::new(tx)).await.unwrap();
+
+    let _resp = pending.get_receipt().await.unwrap();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn can_reject_underpriced_replacement() {
     let (api, handle) = spawn(NodeConfig::test()).await;
@@ -264,7 +286,7 @@ async fn can_reject_underpriced_replacement() {
     let higher_priced_receipt = higher_priced_pending_tx.get_receipt().await.unwrap();
 
     // ensure that only the higher priced tx was mined
-    let block = provider.get_block(1.into(), false).await.unwrap().unwrap();
+    let block = provider.get_block(1.into(), false.into()).await.unwrap().unwrap();
     assert_eq!(1, block.transactions.len());
     assert_eq!(
         BlockTransactions::Hashes(vec![higher_priced_receipt.transaction_hash]),
@@ -277,7 +299,7 @@ async fn can_deploy_greeter_http() {
     let (_api, handle) = spawn(NodeConfig::test()).await;
     let wallet = handle.dev_wallets().next().unwrap();
 
-    let signer: EthereumSigner = wallet.clone().into();
+    let signer: EthereumWallet = wallet.clone().into();
 
     let alloy_provider = http_provider_with_signer(&handle.http_endpoint(), signer);
 
@@ -530,7 +552,7 @@ async fn call_past_state() {
     assert_eq!(value._0, "initial value");
 
     let hash = provider
-        .get_block(BlockId::Number(1.into()), false)
+        .get_block(BlockId::Number(1.into()), false.into())
         .await
         .unwrap()
         .unwrap()
@@ -701,7 +723,30 @@ async fn can_get_pending_transaction() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_first_noce_is_zero() {
+async fn can_get_raw_transaction() {
+    let (api, handle) = spawn(NodeConfig::test()).await;
+
+    // first test the pending tx, disable auto mine
+    api.anvil_set_auto_mine(false).await.unwrap();
+
+    let provider = handle.http_provider();
+
+    let from = handle.dev_wallets().next().unwrap().address();
+    let tx = TransactionRequest::default().from(from).value(U256::from(1488)).to(Address::random());
+    let tx = WithOtherFields::new(tx);
+    let tx = provider.send_transaction(tx).await.unwrap();
+
+    let res1 = api.raw_transaction(*tx.tx_hash()).await;
+    assert!(res1.is_ok());
+
+    api.mine_one().await;
+    let res2 = api.raw_transaction(*tx.tx_hash()).await;
+
+    assert_eq!(res1.unwrap(), res2.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_first_nonce_is_zero() {
     let (api, handle) = spawn(NodeConfig::test()).await;
 
     api.anvil_set_auto_mine(false).await.unwrap();
@@ -834,7 +879,7 @@ async fn test_tx_receipt() {
     let tx = WithOtherFields::new(tx);
     let tx = provider.send_transaction(tx).await.unwrap().get_receipt().await.unwrap();
 
-    // `to` field is none if it's a contract creation transaction: https://eth.wiki/json-rpc/API#eth_getTransactionReceipt
+    // `to` field is none if it's a contract creation transaction: https://ethereum.org/developers/docs/apis/json-rpc/#eth_gettransactionreceipt
     assert!(tx.to.is_none());
     assert!(tx.contract_address.is_some());
 }
@@ -1076,8 +1121,7 @@ async fn test_estimate_gas() {
     let error_message = error_result.unwrap_err().to_string();
     assert!(
         error_message.contains("Insufficient funds for gas * price + value"),
-        "Error message did not match expected: {}",
-        error_message
+        "Error message did not match expected: {error_message}"
     );
 
     // Setup state override to simulate sufficient funds for the recipient.

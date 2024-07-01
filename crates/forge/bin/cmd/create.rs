@@ -1,10 +1,11 @@
 use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
-use alloy_network::{AnyNetwork, EthereumSigner, TransactionBuilder};
-use alloy_primitives::{Address, Bytes};
+use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
+use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{Provider, ProviderBuilder};
-use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest, WithOtherFields};
+use alloy_rpc_types::{AnyTransactionReceipt, TransactionRequest};
+use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
 use clap::{Parser, ValueHint};
@@ -143,7 +144,7 @@ impl CreateArgs {
             let signer = self.eth.wallet.signer().await?;
             let deployer = signer.address();
             let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                .signer(EthereumSigner::new(signer))
+                .wallet(EthereumWallet::new(signer))
                 .on_provider(provider);
             self.deploy(abi, bin, params, provider, chain_id, deployer).await
         }
@@ -362,7 +363,7 @@ impl CreateArgs {
             params.push((ty, arg));
         }
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
-        parse_tokens(params)
+        parse_tokens(params).map_err(Into::into)
     }
 }
 
@@ -394,7 +395,7 @@ where
     B: Clone,
 {
     fn clone(&self) -> Self {
-        ContractDeploymentTx { deployer: self.deployer.clone(), _contract: self._contract }
+        Self { deployer: self.deployer.clone(), _contract: self._contract }
     }
 }
 
@@ -422,7 +423,7 @@ where
     B: Clone,
 {
     fn clone(&self) -> Self {
-        Deployer {
+        Self {
             tx: self.tx.clone(),
             abi: self.abi.clone(),
             client: self.client.clone(),
@@ -512,7 +513,7 @@ where
     B: Clone,
 {
     fn clone(&self) -> Self {
-        DeploymentTxFactory {
+        Self {
             client: self.client.clone(),
             abi: self.abi.clone(),
             bytecode: self.bytecode.clone(),

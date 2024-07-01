@@ -3,15 +3,17 @@ use crate::provider::VerificationContext;
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
-    artifacts::{BytecodeHash, Source},
+    artifacts::{BytecodeHash, Source, Sources},
+    buildinfo::RawBuildInfo,
     compilers::{
         solc::{SolcCompiler, SolcLanguage, SolcVersionedInput},
         Compiler, CompilerInput,
     },
-    AggregatedCompilerOutput, Solc,
+    solc::Solc,
+    AggregatedCompilerOutput,
 };
 use semver::{BuildMetadata, Version};
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct EtherscanFlattenedSource;
@@ -57,7 +59,7 @@ impl EtherscanSourceProvider for EtherscanFlattenedSource {
 impl EtherscanFlattenedSource {
     /// Attempts to compile the flattened content locally with the compiler version.
     ///
-    /// This expects the completely flattened `content´ and will try to compile it using the
+    /// This expects the completely flattened content and will try to compile it using the
     /// provided compiler. If the compiler is missing it will be installed.
     ///
     /// # Errors
@@ -79,7 +81,7 @@ impl EtherscanFlattenedSource {
         let solc = Solc::find_or_install(&version)?;
 
         let input = SolcVersionedInput::build(
-            BTreeMap::from([("contract.sol".into(), Source::new(content))]),
+            Sources::from([("contract.sol".into(), Source::new(content))]),
             Default::default(),
             SolcLanguage::Solidity,
             version.clone(),
@@ -87,8 +89,8 @@ impl EtherscanFlattenedSource {
 
         let out = SolcCompiler::Specific(solc).compile(&input)?;
         if out.errors.iter().any(|e| e.is_error()) {
-            let mut o = AggregatedCompilerOutput::default();
-            o.extend(version, out);
+            let mut o = AggregatedCompilerOutput::<SolcCompiler>::default();
+            o.extend(version, RawBuildInfo::new(&input, &out, false)?, out);
             let diags = o.diagnostics(&[], &[], Default::default());
 
             eyre::bail!(
