@@ -2845,11 +2845,11 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "clearscreen"
-version = "4.0.3"
+version = "4.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1430e4fe087fa90b9fc465ddbe00b994df4dd2c8a05f8fd5e43815bbf541b2dc"
+checksum = "5def4343d62f01f67ff1a49147e4a15112e936c6a6a3f8ff7a29394e76468244"
 dependencies = [
- "nix 0.30.1",
+ "nix 0.31.1",
  "terminfo",
  "thiserror 2.0.18",
  "which",
@@ -3812,14 +3812,14 @@ dependencies = [
 
 [[package]]
 name = "email-address-parser"
-version = "2.0.0"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fe19a4967eca30062be4abaf813d929ba48b3bfb21830367f7e1baae37f213a"
+checksum = "e981c3b50d728bb498dd0f860a7228ef17e19efef5cc2c6e30d78ebce13bcaa7"
 dependencies = [
  "console_error_panic_hook",
  "pest",
  "pest_derive",
- "quick-xml 0.18.1",
+ "quick-xml 0.39.2",
  "wasm-bindgen",
 ]
 
@@ -6227,9 +6227,9 @@ checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
 name = "jiff"
-version = "0.2.20"
+version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c867c356cc096b33f4981825ab281ecba3db0acefe60329f044c1789d94c6543"
+checksum = "b3e3d65f018c6ae946ab16e80944b97096ed73c35b221d1c478a6c81d8f57940"
 dependencies = [
  "jiff-static",
  "log",
@@ -6240,9 +6240,9 @@ dependencies = [
 
 [[package]]
 name = "jiff-static"
-version = "0.2.20"
+version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7946b4325269738f270bb55b3c19ab5c5040525f83fd625259422a9d25d9be5"
+checksum = "a17c2b211d863c7fde02cbea8a3c1a439b98e109286554f2860bdded7ff83818"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7374,9 +7374,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "owo-colors"
-version = "4.2.3"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c6901729fa79e91a0913333229e9ca5dc725089d1c363b2f4b4760709dc4a52"
+checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 
 [[package]]
 name = "p256"
@@ -8102,18 +8102,18 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.18.1"
+version = "0.38.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cc440ee4802a86e357165021e3e255a9143724da31db1e2ea540214c96a0f82"
+checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
 dependencies = [
  "memchr",
 ]
 
 [[package]]
 name = "quick-xml"
-version = "0.38.4"
+version = "0.39.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+checksum = "958f21e8e7ceb5a1aa7fa87fab28e7c75976e0bfe7e23ff069e0a260f894067d"
 dependencies = [
  "memchr",
 ]
@@ -11578,13 +11578,14 @@ dependencies = [
 
 [[package]]
 name = "watchexec"
-version = "8.0.1"
+version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc35794a21139060aca512393e9b1a225fe48fc11edee65c84d6d76b25a53331"
+checksum = "027babfd8b2aae6ece0fa7e25b35a7fdf88b2aa89c7dd0f6aad48ca2a08bbd4a"
 dependencies = [
  "async-priority-channel",
  "atomic-take",
  "futures",
+ "libc",
  "miette",
  "normalize-path",
  "notify",
@@ -11594,13 +11595,14 @@ dependencies = [
  "watchexec-events",
  "watchexec-signals",
  "watchexec-supervisor",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "watchexec-events"
-version = "6.0.0"
+version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c4a8973a20c7d30198a12272519163168a9ba8b687693ec9d1f027b75b860d1"
+checksum = "ad87c046fa1050d22100e7d234db2cbf6ffd020b0ae2deff4bef6faa8f71ac44"
 dependencies = [
  "notify-types",
  "watchexec-signals",
@@ -11619,9 +11621,9 @@ dependencies = [
 
 [[package]]
 name = "watchexec-supervisor"
-version = "5.0.2"
+version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a10a48302bf1927c9cb5a2974b6c77d6f214cb50442efec57c26b2f0a6c3689e"
+checksum = "ddb766a4282cd9e71a6011e800ed7f863bb7134435bf4c7abc6b55ca3afc78ec"
 dependencies = [
  "futures",
  "process-wrap",
