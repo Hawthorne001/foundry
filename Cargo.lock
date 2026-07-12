@@ -134,7 +134,7 @@ dependencies = [
  "either",
  "k256",
  "once_cell",
- "rand 0.8.6",
+ "rand 0.8.7",
  "secp256k1 0.30.0",
  "serde",
  "serde_json",
@@ -497,7 +497,7 @@ dependencies = [
  "paste",
  "proptest",
  "proptest-derive",
- "rand 0.9.4",
+ "rand 0.9.5",
  "rapidhash",
  "ruint",
  "rustc-hash",
@@ -710,7 +710,7 @@ dependencies = [
  "ethereum_ssz",
  "ethereum_ssz_derive",
  "jsonwebtoken",
- "rand 0.8.6",
+ "rand 0.8.7",
  "serde",
  "strum 0.27.2",
 ]
@@ -862,7 +862,7 @@ dependencies = [
  "coins-bip39",
  "eth-keystore",
  "k256",
- "rand 0.8.6",
+ "rand 0.8.7",
  "thiserror 2.0.18",
  "zeroize",
 ]
@@ -1240,8 +1240,8 @@ dependencies = [
  "op-alloy-rpc-types",
  "op-revm",
  "parking_lot",
- "rand 0.8.6",
- "rand 0.9.4",
+ "rand 0.8.7",
+ "rand 0.9.5",
  "reqwest 0.13.4",
  "revm",
  "revm-inspectors",
@@ -1278,7 +1278,7 @@ dependencies = [
  "foundry-common",
  "foundry-evm",
  "foundry-primitives",
- "rand 0.9.4",
+ "rand 0.9.5",
  "revm",
  "serde",
  "serde_json",
@@ -1678,7 +1678,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df2c09229cbc5a028b1d70e00fdb2acee28b1055dfb5ca73eea49c5a25c4e7c"
 dependencies = [
  "num-traits",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -1688,7 +1688,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -1698,7 +1698,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -1708,7 +1708,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "367c9c827ed431bff6868b7aa926e05b16eb46603cc8b6e768e4a5553fa1d155"
 dependencies = [
  "num-traits",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -2571,7 +2571,7 @@ dependencies = [
  "num_enum",
  "paste",
  "portable-atomic",
- "rand 0.9.4",
+ "rand 0.9.5",
  "regress",
  "rustc-hash",
  "ryu-js",
@@ -2907,8 +2907,8 @@ dependencies = [
  "op-alloy-flz",
  "op-alloy-network",
  "path-slash",
- "rand 0.8.6",
- "rand 0.9.4",
+ "rand 0.8.7",
+ "rand 0.9.5",
  "rayon",
  "regex",
  "revm",
@@ -2940,9 +2940,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.66"
+version = "1.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d6cac793997bd970000024b2934968efe83b382de4fdcf4fcb46b6ee4ad996"
+checksum = "e17dd265a7d0f31ef544e1b20e03add05d3b45b491b633b10d67145d2acc1a38"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -3238,7 +3238,7 @@ dependencies = [
  "hmac 0.12.1",
  "once_cell",
  "pbkdf2 0.12.2",
- "rand 0.8.6",
+ "rand 0.8.7",
  "sha2 0.10.9",
  "thiserror 1.0.69",
 ]
@@ -3378,7 +3378,7 @@ dependencies = [
  "cfg-if",
  "commonware-macros",
  "paste",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_chacha 0.3.1",
  "thiserror 2.0.18",
 ]
@@ -3397,7 +3397,7 @@ dependencies = [
  "commonware-storage",
  "commonware-utils",
  "num-rational",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "rayon",
  "reed-solomon-simd",
@@ -3426,7 +3426,7 @@ dependencies = [
  "futures",
  "pin-project",
  "prometheus-client",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "rand_distr",
  "rayon",
@@ -3459,7 +3459,7 @@ dependencies = [
  "num-rational",
  "num-traits",
  "p256",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "sha2 0.10.9",
@@ -3521,7 +3521,7 @@ dependencies = [
  "num-rational",
  "num-traits",
  "prometheus-client",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "rand_distr",
  "thiserror 2.0.18",
@@ -3553,7 +3553,7 @@ dependencies = [
  "commonware-utils",
  "futures",
  "prometheus-client",
- "rand 0.8.6",
+ "rand 0.8.7",
  "thiserror 2.0.18",
  "tracing",
 ]
@@ -3581,7 +3581,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry_sdk",
  "prometheus-client",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "rayon",
  "sha2 0.10.9",
@@ -3629,7 +3629,7 @@ dependencies = [
  "commonware-runtime",
  "commonware-utils",
  "futures",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rand_core 0.6.4",
  "thiserror 2.0.18",
  "x25519-dalek",
@@ -3654,7 +3654,7 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "pin-project",
- "rand 0.8.6",
+ "rand 0.8.7",
  "thiserror 2.0.18",
  "tokio",
  "zeroize",
@@ -4670,7 +4670,7 @@ dependencies = [
  "hex",
  "hmac 0.12.1",
  "pbkdf2 0.11.0",
- "rand 0.8.6",
+ "rand 0.8.7",
  "scrypt",
  "serde",
  "serde_json",
@@ -4880,7 +4880,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835c052cb0c08c1acf6ffd71c022172e18723949c8282f2b9f27efbc51e64534"
 dependencies = [
  "byteorder",
- "rand 0.8.6",
+ "rand 0.8.7",
  "rustc-hex",
  "static_assertions",
 ]
@@ -5000,7 +5000,7 @@ dependencies = [
  "path-slash",
  "proptest",
  "quick-junit",
- "rand 0.9.4",
+ "rand 0.9.5",
  "rayon",
  "regex",
  "reqwest 0.13.4",
@@ -5278,7 +5278,7 @@ dependencies = [
  "p256",
  "parking_lot",
  "proptest",
- "rand 0.9.4",
+ "rand 0.9.5",
  "revm",
  "revm-inspectors",
  "semver 1.0.28",
@@ -5650,7 +5650,7 @@ dependencies = [
  "indicatif",
  "parking_lot",
  "proptest",
- "rand 0.9.4",
+ "rand 0.9.5",
  "rayon",
  "revm",
  "revm-inspectors",
@@ -5766,7 +5766,7 @@ dependencies = [
  "itertools 0.15.0",
  "parking_lot",
  "proptest",
- "rand 0.9.4",
+ "rand 0.9.5",
  "revm",
  "serde",
  "solar-compiler",
@@ -5956,7 +5956,7 @@ dependencies = [
  "foundry-config",
  "idna_adapter",
  "parking_lot",
- "rand 0.9.4",
+ "rand 0.9.5",
  "regex",
  "reqwest 0.13.4",
  "serde_json",
@@ -6314,7 +6314,7 @@ dependencies = [
  "parking_lot",
  "portable-atomic",
  "quanta",
- "rand 0.9.4",
+ "rand 0.9.5",
  "smallvec",
  "spinning_top",
  "web-time",
@@ -8252,7 +8252,7 @@ dependencies = [
  "futures-util",
  "opentelemetry",
  "percent-encoding",
- "rand 0.9.4",
+ "rand 0.9.5",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
@@ -8534,7 +8534,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
  "phf_shared 0.11.3",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -8876,7 +8876,7 @@ dependencies = [
  "bit-vec",
  "bitflags 2.13.0",
  "num-traits",
- "rand 0.9.4",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_xorshift",
  "regex-syntax",
@@ -9130,9 +9130,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
+checksum = "22f6172bdec972074665ed81ed53b71da00bfc44b65a753cfde883ec4c702a1a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -9142,9 +9142,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -9214,7 +9214,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
 dependencies = [
  "num-traits",
- "rand 0.8.6",
+ "rand 0.8.7",
 ]
 
 [[package]]
@@ -10442,8 +10442,8 @@ dependencies = [
  "parity-scale-codec",
  "primitive-types",
  "proptest",
- "rand 0.8.6",
- "rand 0.9.4",
+ "rand 0.8.7",
+ "rand 0.9.5",
  "rlp",
  "ruint-macro",
  "serde_core",
@@ -10494,7 +10494,7 @@ version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
 dependencies = [
- "rand 0.9.4",
+ "rand 0.9.5",
 ]
 
 [[package]]
@@ -10802,7 +10802,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b50c5943d326858130af85e049f2661ba3c78b26589b8ab98e65e80ae44a1252"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.8.6",
+ "rand 0.8.7",
  "secp256k1-sys 0.10.1",
  "serde",
 ]
@@ -10814,7 +10814,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c3c81b43dc2d8877c216a3fccf76677ee1ebccd429566d3e67447290d0c42b2"
 dependencies = [
  "bitcoin_hashes",
- "rand 0.9.4",
+ "rand 0.9.5",
  "secp256k1-sys 0.11.0",
 ]
 
@@ -12805,7 +12805,7 @@ dependencies = [
  "http 1.4.2",
  "httparse",
  "log",
- "rand 0.9.4",
+ "rand 0.9.5",
  "rustls",
  "rustls-pki-types",
  "sha1",
@@ -12824,7 +12824,7 @@ dependencies = [
  "http 1.4.2",
  "httparse",
  "log",
- "rand 0.9.4",
+ "rand 0.9.5",
  "sha1",
  "thiserror 2.0.18",
 ]
